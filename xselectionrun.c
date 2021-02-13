@@ -1,11 +1,12 @@
 /*
  * xselectionrun.c
  *
- * run a command on the selection and show the result
+ * on pressing F1, run a command on the selection and show the result
  */
 
 /*
  * todo:
+ * - document that the selection is currently limited to 200 bytes
  * - read result until the end, not just the first line
  * - display multiple lines
  * - wrap text in the window
@@ -151,10 +152,15 @@ int main(int argn, char *argv[]) {
 
 	if (argn - 1 >= 1) {
 		if (! strcmp(argv[1], "-h")) {
-			printf("run a command on the selection and ");
+			printf("on F1, run a command on the selection and ");
 			printf("display output\n");
 			printf("usage example:\n");
-			printf("\txselectionrun \"echo 'selection: %%s'\"\n");
+			printf("\txselectionrun \"grep '%%s' data.txt\"\n");
+			printf("\tselect some text\n");
+			printf("\tpress F1\n");
+			printf("\tthis makes \"grep ...\" being executed ");
+			printf("with the selection\n");
+			printf("\tin place of %%s and the result shown\n");
 			exit(EXIT_SUCCESS);
 		}
 		template = argv[1];
