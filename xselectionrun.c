@@ -165,6 +165,8 @@ int main(int argn, char *argv[]) {
 			printf("\tthis makes \"grep ...\" being executed ");
 			printf("with the selection\n");
 			printf("\tin place of %%s and the result shown\n");
+			printf("\tpress F1 again to remove it from");
+			printf(" the screen\n");
 			exit(EXIT_SUCCESS);
 		}
 		template = argv[1];
