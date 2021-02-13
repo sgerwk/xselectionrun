@@ -150,7 +150,11 @@ int main(int argn, char *argv[]) {
 
 					/* arguments */
 
-	if (argn - 1 >= 1) {
+	if (argn - 1 < 1) {
+		printf("argument required: see -h for details\n");
+		exit(EXIT_FAILURE);
+	}
+	else {
 		if (! strcmp(argv[1], "-h")) {
 			printf("on F1, run a command on the selection and ");
 			printf("display output\n");
