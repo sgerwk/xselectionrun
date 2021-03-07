@@ -157,16 +157,15 @@ int main(int argn, char *argv[]) {
 	else {
 		if (! strcmp(argv[1], "-h")) {
 			printf("on F1, run a command on the selection and ");
-			printf("display output\n");
+			printf("show its output\n");
 			printf("usage example:\n");
 			printf("\txselectionrun \"grep '%%s' data.txt\"\n");
 			printf("\tselect some text\n");
-			printf("\tpress F1\n");
-			printf("\tthis makes \"grep ...\" being executed ");
-			printf("with the selection\n");
-			printf("\tin place of %%s and the result shown\n");
-			printf("\tpress F1 again to remove it from");
-			printf(" the screen\n");
+			printf("\tpress F1 ");
+			printf("(shows the result of running grep with the ");
+			printf("selection)\n");
+			printf("\tpress F1 ");
+			printf("(removes the result from the screen)\n");
 			exit(EXIT_SUCCESS);
 		}
 		template = argv[1];

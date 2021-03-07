@@ -2,7 +2,7 @@ xselectionrun
 =============
 
 Run a program on the X11 selection on ``F1`` and display the result.
-Pressing ``F1`` removes the result from the screen.
+Pressing ``F1`` again removes the result from the screen.
 
 examples
 --------
