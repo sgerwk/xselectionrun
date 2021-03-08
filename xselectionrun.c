@@ -33,6 +33,19 @@
 #define FONT "-*-*-medium-r-*-*-18-*-*-*-m-*-iso10646-1"
 
 /*
+ * concatenate two strings
+ */
+char *strdupcat(char *a, char *b) {
+	char *res;
+
+	res = malloc(strlen(a) + strlen(b) + 1);
+	strcpy(res, a);
+	strcat(res, b);
+
+	return res;
+}
+
+/*
  * retrieve the selection
  */
 char *GetSelection(Display *dsp, Window win, XEvent ev) {
@@ -76,17 +89,16 @@ char *RunCommand(char *template, char *selection) {
 
 	fifo = popen(command, "r");
 	if (fifo == NULL)
-		return strdup(strerror(errno));
+		return strdupcat(">> pipe creation error: ", strerror(errno));
 
 	result = malloc(100);
 	if (NULL != fgets(result, 99, fifo))
 		result[strlen(result) - 1] = '\0';
 	else {
 		free(result);
-		if (errno == EAGAIN)
-			result = strdup(">>> no output from command <<<");
-		else
-			result = strdup(strerror(errno));
+		result = errno == EAGAIN ?
+			strdupcat(">> no output from command: ", command) :
+			strdupcat(">> reading error: ", strerror(errno));
 	}
 
 	ret = pclose(fifo);
@@ -95,11 +107,11 @@ char *RunCommand(char *template, char *selection) {
 		return result;
 	free(result);
 	if (! WIFEXITED(ret))
-		return strdup(">>> abnormal command termination <<<");
+		return strdupcat(">> abnormal command termination: ", command);
 	if (WEXITSTATUS(ret) == 127)
-		return strdup(">>> command not found <<<");
+		return strdupcat(">> command not found: ", command);
 	if (WEXITSTATUS(ret) == 126)
-		return strdup(">>> command not executable <<<");
+		return strdupcat(">> command not executable: ", command);
 	return strdup(strerror(WEXITSTATUS(ret)));
 }
 
@@ -184,12 +196,8 @@ int main(int argn, char *argv[]) {
 
 	if (strstr(argv[1], "%s"))
 		template = argv[1];
-	else {
-		template = malloc(strlen(argv[1]) + sizeof("%s") + 2);
-		strcpy(template, argv[1]);
-		strcat(template, " ");
-		strcat(template, "%s");
-	}
+	else
+		template = strdupcat(argv[1], " '%s'");
 
 					/* open display */
 
