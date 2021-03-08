@@ -160,7 +160,7 @@ int main(int argn, char *argv[]) {
 	XEvent ev;
 	XKeyEvent *k;
 	char *selection = NULL, *result = NULL;
-	char *template = "echo '>>> %s <<<'";
+	char *template;
 
 					/* arguments */
 
