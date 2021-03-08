@@ -168,21 +168,27 @@ int main(int argn, char *argv[]) {
 		printf("argument required: see -h for details\n");
 		exit(EXIT_FAILURE);
 	}
-	else {
-		if (! strcmp(argv[1], "-h")) {
-			printf("on F1, run a command on the selection and ");
-			printf("show its output\n");
-			printf("usage example:\n");
-			printf("\txselectionrun \"grep '%%s' data.txt\"\n");
-			printf("\tselect some text\n");
-			printf("\tpress F1 ");
-			printf("(shows the result of running grep with the ");
-			printf("selection)\n");
-			printf("\tpress F1 ");
-			printf("(removes the result from the screen)\n");
-			exit(EXIT_SUCCESS);
-		}
+	else if (! strcmp(argv[1], "-h")) {
+		printf("on F1, run a command on the selection and ");
+		printf("show its output\n");
+		printf("usage example:\n");
+		printf("\txselectionrun \"grep '%%s' data.txt\"\n");
+		printf("\tselect some text\n");
+		printf("\tpress F1 ");
+		printf("(shows the result of running grep with the ");
+		printf("selection)\n");
+		printf("\tpress F1 ");
+		printf("(removes the result from the screen)\n");
+		exit(EXIT_SUCCESS);
+	}
+
+	if (strstr(argv[1], "%s"))
 		template = argv[1];
+	else {
+		template = malloc(strlen(argv[1]) + sizeof("%s") + 2);
+		strcpy(template, argv[1]);
+		strcat(template, " ");
+		strcat(template, "%s");
 	}
 
 					/* open display */
