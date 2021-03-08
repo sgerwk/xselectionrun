@@ -1,0 +1,58 @@
+.TH xselectionrun 1 "March 7, 2021"
+
+.
+.
+.
+.SH NAME
+
+xselectionrun - run a program on the X11 selection
+
+.
+.
+.
+.SH SYNOPSIS
+
+.B xselectionrun
+.I command
+
+
+.
+.
+.
+.SH DESCRIPTION
+
+
+Run a program on the X11 selection on \fIF1\fP and display the result.
+Pressing \fIF1\fP again removes the result from the screen.
+
+.
+.
+.
+.SH OPTIONS
+
+The only argument the program takes is a string that contains \fI%s\fP. When
+\fIF1\fP is pressed, the text that is currently selected in whichever window
+replaces \fI%s\fP in this string, which is then executed. What results is shown
+until \fIF1\fP is pressed again.
+
+.
+.
+.
+.SH EXAMPLES
+
+An example is \fIxselectionrun "grep '%s' data.txt"\fP. Pressing \fIF1\fP when
+a piece of text is selected displays the first line of \fIfile.txt\fP that
+contains that text.
+
+This saves time if retrieving such an information has to be done many times. A
+similar example is \fIxselectionrun "grep -i '^%s ' /etc/services"\fP, which
+displays the port number of a protocol when its name is selected and \fIF1\fP
+pressed.
+
+The command that is executed on the selection needs not to be \fIgrep(1)\fP. It
+can be any command, provided that it produces a single output line. An example
+is \fIxselectionrun "man -f %s | head -1"\fP, which displays a short
+description of a command or library function. Another is
+\fIxselectionrun "echo '%s' | hunspell | sed -n '2 p'"\fP,
+which runs the spell checker on the selected word.
+
