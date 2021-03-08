@@ -68,25 +68,39 @@ char *RunCommand(char *template, char *selection) {
 	FILE *fifo;
 	char *command;
 	char *result;
+	int ret;
 
 	command = malloc(strlen(template) + strlen(selection) + 1);
 	sprintf(command, template, selection);
+	printf("executing %s\n", command);
+
 	fifo = popen(command, "r");
-	if (fifo == NULL) {
-		perror(command);
-		printf("returning NULL\n");
-		return NULL;
-	}
+	if (fifo == NULL)
+		return strdup(strerror(errno));
 
 	result = malloc(100);
-	if (NULL == fgets(result, 99, fifo)) {
-		free(result);
-		result = strdup(strerror(errno));
-	}
-	else
+	if (NULL != fgets(result, 99, fifo))
 		result[strlen(result) - 1] = '\0';
-	pclose(fifo);
-	return result;
+	else {
+		free(result);
+		if (errno == EAGAIN)
+			result = strdup(">>> no output from command <<<");
+		else
+			result = strdup(strerror(errno));
+	}
+
+	ret = pclose(fifo);
+	printf("result: %d %d %d\n", ret, WIFEXITED(ret), WEXITSTATUS(ret));
+	if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0)
+		return result;
+	free(result);
+	if (! WIFEXITED(ret))
+		return strdup(">>> abnormal command termination <<<");
+	if (WEXITSTATUS(ret) == 127)
+		return strdup(">>> command not found <<<");
+	if (WEXITSTATUS(ret) == 126)
+		return strdup(">>> command not executable <<<");
+	return strdup(strerror(WEXITSTATUS(ret)));
 }
 
 /*
