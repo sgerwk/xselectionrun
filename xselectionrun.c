@@ -105,6 +105,8 @@ char *RunCommand(char *template, char *selection) {
 	printf("result: %d %d %d\n", ret, WIFEXITED(ret), WEXITSTATUS(ret));
 	if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0)
 		return result;
+	if (WIFEXITED(ret) && WEXITSTATUS(ret) == 1)
+		return result;
 	free(result);
 	if (! WIFEXITED(ret))
 		return strdupcat(">> abnormal command termination: ", command);
