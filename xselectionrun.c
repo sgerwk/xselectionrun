@@ -77,26 +77,29 @@ char *GetSelection(Display *dsp, Window win, XEvent ev) {
 /*
  * run the command, return the first line of the result
  */
-char *RunCommand(char *template, char *selection) {
+int RunCommand(char *template, char *selection, char **result) {
 	FILE *fifo;
 	char *command;
-	char *result;
 	int ret;
 
 	command = malloc(strlen(template) + strlen(selection) + 1);
 	sprintf(command, template, selection);
-	printf("executing %s\n", command);
+	printf("executing: %s\n", command);
 
 	fifo = popen(command, "r");
-	if (fifo == NULL)
-		return strdupcat(">> pipe creation error: ", strerror(errno));
+	if (fifo == NULL) {
+		*result =
+			strdupcat(">> pipe creation error: ", strerror(errno));
+		return -1;
+	}
 
-	result = malloc(100);
-	if (NULL != fgets(result, 99, fifo))
-		result[strlen(result) - 1] = '\0';
+	*result = malloc(100);
+	if (NULL != fgets(*result, 99, fifo))
+		(*result)[strlen(*result) - 1] = '\0';
 	else {
-		free(result);
-		result = errno == EAGAIN ?
+		free(*result);
+		printf("errno: %d\n", errno);
+		*result = errno == EAGAIN ?
 			strdupcat(">> no output from command: ", command) :
 			strdupcat(">> reading error: ", strerror(errno));
 	}
@@ -104,17 +107,20 @@ char *RunCommand(char *template, char *selection) {
 	ret = pclose(fifo);
 	printf("result: %d %d %d\n", ret, WIFEXITED(ret), WEXITSTATUS(ret));
 	if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0)
-		return result;
+		return 0;
 	if (WIFEXITED(ret) && WEXITSTATUS(ret) == 1)
-		return result;
-	free(result);
+		return -1;
+	free(*result);
 	if (! WIFEXITED(ret))
-		return strdupcat(">> abnormal command termination: ", command);
-	if (WEXITSTATUS(ret) == 127)
-		return strdupcat(">> command not found: ", command);
-	if (WEXITSTATUS(ret) == 126)
-		return strdupcat(">> command not executable: ", command);
-	return strdup(strerror(WEXITSTATUS(ret)));
+		*result = strdupcat(">> abnormal command termination: ",
+		                    command);
+	else if (WEXITSTATUS(ret) == 127)
+		*result = strdupcat(">> command not found: ", command);
+	else if (WEXITSTATUS(ret) == 126)
+		*result = strdupcat(">> command not executable: ", command);
+	else
+		*result = strdupcat(">> error: ", strerror(WEXITSTATUS(ret)));
+	return -1;
 }
 
 /*
@@ -155,7 +161,10 @@ void WindowAtPointer(Display *d, Window w) {
 /*
  * draw window
  */
-void DrawWindow(Display *dsp, Window win, GC gc, char *result) {
+void DrawWindow(Display *dsp, Window win, GC gc, int ret, char *result) {
+	XSetWindowBackground(dsp, win,
+		ret ? BlackPixel(dsp, 0) : WhitePixel(dsp, 0));
+	XSetForeground(dsp, gc, ret ? WhitePixel(dsp, 0) : BlackPixel(dsp, 0));
 	XClearWindow(dsp, win);
 	XDrawString(dsp, win, gc, 4, 20, result, strlen(result));
 }
@@ -170,7 +179,7 @@ int main(int argn, char *argv[]) {
 	XFontStruct *fs;
 	GC gc;
 	Bool serving = False;
-	int res;
+	int res, ret;
 	XEvent ev;
 	XKeyEvent *k;
 	char *selection = NULL, *result = NULL;
@@ -263,14 +272,14 @@ int main(int argn, char *argv[]) {
 				serving = False;
 				break;
 			}
-			result = RunCommand(template, selection);
+			ret = RunCommand(template, selection, &result);
 			free(selection);
 			if (result == NULL) {
 				printf("failed running command\n");
 				serving = False;
 				break;
 			}
-			printf("%s\n", result);
+			printf("command execution: %d \"%s\"\n", ret, result);
 			WindowAtPointer(dsp, win);
 			XMapWindow(dsp, win);
 			break;
@@ -280,7 +289,7 @@ int main(int argn, char *argv[]) {
 		case Expose:
 			if (result == NULL)
 				break;
-			DrawWindow(dsp, win, gc, result);
+			DrawWindow(dsp, win, gc, ret, result);
 			break;
 		default:
 			printf("unexpected event of type %d\n", ev.type);
