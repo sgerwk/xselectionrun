@@ -20,6 +20,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <X11/Xlib.h>
@@ -170,31 +171,197 @@ void DrawWindow(Display *dsp, Window win, GC gc, int ret, char *result) {
 }
 
 /*
+ * get a timestamp for "now" (see ICCCM)
+ */
+Time GetTimestampForNow(Display *d, Window w) {
+	XEvent e;
+
+	XChangeProperty(d, w, XA_CURSOR, XA_STRING, 8, PropModeAppend, NULL, 0);
+	XWindowEvent(d, w, PropertyChangeMask, &e);
+	return e.xproperty.time;
+}
+
+/*
+ * acquire ownership of the primary selection
+ */
+Bool AcquirePrimarySelection(Display *d, Window root, Window w, Time *t) {
+	Window o;
+
+	XSetSelectionOwner(d, XA_PRIMARY, w, CurrentTime);
+	o = XGetSelectionOwner(d, XA_PRIMARY);
+	if (o != w) {
+		printf("Cannot get selection ownership\n");
+		return True;
+	}
+	if (t != NULL)
+		*t = GetTimestampForNow(d, w);
+	XDeleteProperty(d, root, XInternAtom(d, "CUT_BUFFER0", True));
+	return False;
+}
+
+/*
+ * check whether target of selection is supported
+ */
+Bool UnsupportedSelection(Display *d, Atom type, int stringonly) {
+	if (type == XA_STRING)
+		return False;
+	if (type == XInternAtom(d, "TARGETS", False))
+		return False;
+	if (! stringonly && type == XInternAtom(d, "UTF8_STRING", False))
+		return False;
+	return True;
+}
+
+/*
+ * refuse to send selection
+ */
+void RefuseSelection(Display *d, XSelectionRequestEvent *re) {
+	XEvent ne;
+
+	printf("refusing to send selection\n");
+
+	ne.type = SelectionNotify;
+	ne.xselection.requestor = re->requestor;
+	ne.xselection.selection = re->selection;
+	ne.xselection.target = re->target;
+	ne.xselection.property = None;
+	ne.xselection.time = re->time;
+
+	XSendEvent(d, re->requestor, True, NoEventMask, &ne);
+}
+
+/*
+ * send the selection to answer a selection request event
+ *
+ * - it the requested target is not a string (or utf8), do not send it
+ * - if the property is none, use the target as the property
+ * - check the timestamp: send the selection only if the timestamp is after the
+ *   selection ownership assignment (note: CurrentTime may be implemented as 0)
+ * - change the property of the requestor
+ * - notify the requestor by a PropertyNotify event
+ */
+Bool SendSelection(Display *d, Time t, XSelectionRequestEvent *re,
+		char *chars, int nchars, int stringonly) {
+	XEvent ne;
+	Atom property;
+	int targetlen;
+	Atom targetlist[2];
+
+				/* check type of selection requested */
+
+	if (UnsupportedSelection(d, re->target, stringonly)) {
+		printf("request for an unsupported type\n");
+		RefuseSelection(d, re);
+		return True;
+	}
+
+				/* check property (obsolete clients) */
+
+	if (re->property != None)
+		property = re->property;
+	else {
+		printf("note: property is None\n");
+		property = re->target;
+	}
+
+				/* request precedes time of ownership */
+
+	if (re->time < t && re->time != CurrentTime) {
+		printf("request precedes selection ownership: ");
+		printf("%ld < %ld\n", re->time, t);
+		RefuseSelection(d, re);
+		return True;
+	}
+
+				/* store the selection or the targets */
+
+	if (re->target == XInternAtom(d, "TARGETS", True)) {
+		targetlen = 0;
+		targetlist[targetlen++] = XInternAtom(d, "STRING", True);
+		if (! stringonly)
+			targetlist[targetlen++] =
+				XInternAtom(d, "UTF8_STRING", True);
+		printf("storing selection TARGETS\n");
+		XChangeProperty(d, re->requestor, re->property, // re->target,
+			XInternAtom(d, "ATOM", True), 32,
+			PropModeReplace,
+			(unsigned char *) &targetlist, targetlen);
+	}
+	else {
+		printf("storing selection: %s\n", chars);
+		XChangeProperty(d, re->requestor, re->property, re->target, 8,
+			PropModeReplace,
+			(unsigned char *) chars, nchars);
+	}
+
+				/* send notification */
+
+	ne.type = SelectionNotify;
+	ne.xselection.requestor = re->requestor;
+	ne.xselection.selection = re->selection;
+	ne.xselection.target = re->target;
+	ne.xselection.property = property;
+	ne.xselection.time = re->time;
+
+	XSendEvent(d, re->requestor, True, NoEventMask, &ne);
+
+	printf("selection sent and notified\n");
+
+	return False;
+}
+
+/*
  * main
  */
-int main(int argn, char *argv[]) {
+int main(int argc, char *argv[]) {
+	int opt, usage = False, exitval = EXIT_FAILURE;
+	int show = True, flash = False, select = False;
 	Display *dsp;
         XSetWindowAttributes swa;
 	Window root, win;
 	XFontStruct *fs;
 	GC gc;
-	Bool serving = False;
+	Bool showing = False;
 	int res, ret;
 	XEvent ev;
 	XKeyEvent *k;
+	Time t;
 	char *selection = NULL, *result = NULL;
 	char *template;
 
 					/* arguments */
 
-	if (argn - 1 < 1) {
-		printf("argument required: see -h for details\n");
-		exit(EXIT_FAILURE);
+	while (-1 != (opt = getopt(argc, argv, "qfsh"))) {
+		switch (opt) {
+		case 'q':
+			show = False;
+			break;
+		case 'f':
+			flash = True;
+			break;
+		case 's':
+			select = True;
+			break;
+		case 'h':
+			exitval = EXIT_SUCCESS;
+			// fallthrough
+		default:
+			usage = True;
+			break;
+		}
 	}
-	else if (! strcmp(argv[1], "-h")) {
+	if (argc - optind < 1 && ! usage) {
+		printf("argument required: command\n");
+		usage = True;
+	}
+	if (usage) {
 		printf("on F1, run a command on the selection and ");
 		printf("show its output\n");
-		printf("usage example:\n");
+		printf("usage:\n\txselectionrun [-q] [-f] [-s] command\n");
+		printf("\t\t-q\texecute command but do not show its output\n");
+		printf("\t\t-f\tonly flash output for half a second\n");
+		printf("\t\t-s\tcommand output becomes the new selection\n");
+		printf("example:\n");
 		printf("\txselectionrun \"grep '%%s' data.txt\"\n");
 		printf("\tselect some text\n");
 		printf("\tpress F1 ");
@@ -202,13 +369,13 @@ int main(int argn, char *argv[]) {
 		printf("selection)\n");
 		printf("\tpress F1 ");
 		printf("(removes the result from the screen)\n");
-		exit(EXIT_SUCCESS);
+		exit(exitval);
 	}
 
-	if (strstr(argv[1], "%s"))
-		template = argv[1];
+	if (strstr(argv[optind], "%s"))
+		template = argv[optind];
 	else
-		template = strdupcat(argv[1], " '%s'");
+		template = strdupcat(argv[optind], " '%s'");
 
 					/* open display */
 
@@ -233,7 +400,8 @@ int main(int argn, char *argv[]) {
 
 					/* select events and grab */
 
-	XSelectInput(dsp, win, KeyPressMask | ExposureMask);
+	XSelectInput(dsp, win,
+		KeyPressMask | ExposureMask | PropertyChangeMask);
 
 	res = XGrabKey(dsp, XKeysymToKeycode(dsp, XK_F1), 0,
 			root, False, GrabModeAsync, GrabModeAsync);
@@ -252,14 +420,22 @@ int main(int argn, char *argv[]) {
 			k = &ev.xkey;
 			if (XLookupKeysym(k, 0) == XK_F1 && k->state == 0) {
 				printf("F1 press\n");
-				if (serving) {
-					serving = False;
+				if (showing) {
 					XUnmapWindow(dsp, win);
-					free(result);
-					result = NULL;
+					showing = False;
+					if (! select) {
+						free(result);
+						result = NULL;
+					}
 					break;
 				}
-				serving = True;
+				showing = True;
+				if (XGetSelectionOwner(dsp, XA_PRIMARY) ==
+				    win) {
+					if (show)
+						XMapWindow(dsp, win);
+					break;
+				}
 				XConvertSelection(dsp, XA_PRIMARY, XA_STRING,
 						XA_PRIMARY, win, CurrentTime);
 				// -> SelectionNotify
@@ -269,27 +445,57 @@ int main(int argn, char *argv[]) {
 			selection = GetSelection(dsp, win, ev);
 			if (selection == NULL) {
 				printf("cannot retrieve the selection\n");
-				serving = False;
+				showing = False;
 				break;
 			}
 			ret = RunCommand(template, selection, &result);
 			free(selection);
-			if (result == NULL) {
+			if (ret) {
 				printf("failed running command\n");
-				serving = False;
+				showing = False;
 				break;
 			}
 			printf("command execution: %d \"%s\"\n", ret, result);
 			WindowAtPointer(dsp, win);
-			XMapWindow(dsp, win);
+			if (show)
+				XMapWindow(dsp, win);
+			else
+				showing = False;
+			if (select)
+				AcquirePrimarySelection(dsp, root, win, &t);
+			break;
+		case SelectionRequest:
+			if (result == NULL)
+				break;
+			SendSelection(dsp, t, &ev.xselectionrequest,
+				result, strlen(result), 1);
 			break;
 		case KeyRelease:
 			printf("key release\n");
 			break;
 		case Expose:
+			printf("expose\n");
 			if (result == NULL)
 				break;
 			DrawWindow(dsp, win, gc, ret, result);
+			if (flash) {
+				XFlush(dsp);
+				usleep(500000);
+				XUnmapWindow(dsp, win);
+				showing = False;
+			}
+			break;
+		case PropertyNotify:
+			printf("property notify\n");
+			break;
+		case SelectionClear:
+			printf("selection clear\n");
+			if (flash && select) {
+				XUnmapWindow(dsp, win);
+				showing = False;
+				free(result);
+				result = NULL;
+			}
 			break;
 		default:
 			printf("unexpected event of type %d\n", ev.type);

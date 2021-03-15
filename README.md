@@ -24,6 +24,9 @@ application, or to help filling web forms.
   selecting a word and pressing F1 shows the line of the
   ``data.txt`` file that begins with the word
 
+- ``xselectionrun -q "echo '%s' >> file.txt"``;
+  appends the selection to the file each time F1 is pressed
+
 screenshots
 -----------
 

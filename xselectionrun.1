@@ -13,6 +13,9 @@ xselectionrun - run a program on the X11 selection
 .SH SYNOPSIS
 
 .B xselectionrun
+[\fI-q\fP]
+[\fI-f\fP]
+[\fI-s\fP]
 .I command
 
 
@@ -30,10 +33,24 @@ Pressing \fIF1\fP again removes the result from the screen.
 .
 .SH OPTIONS
 
-The only argument the program takes is a string that contains \fI%s\fP. When
-\fIF1\fP is pressed, the text that is currently selected in whichever window
-replaces \fI%s\fP in this string, which is then executed. What results is shown
-until \fIF1\fP is pressed again. If the argument does not contain \fI%s\fP, the
+.TP
+.B
+-q
+execute the command but do not show its result
+.TP
+.B
+-f
+show the result of the command only for half a second
+.TP
+.B
+-s
+the result of the command becomes the new selection
+
+.P
+The \fIcommand\fP argument is a string that contains \fI%s\fP. When \fIF1\fP is
+pressed, the text that is currently selected in whichever window replaces
+\fI%s\fP in this string, which is then executed. What results is shown until
+\fIF1\fP is pressed again. If the argument does not contain \fI%s\fP, the
 selected text is added at its end.
 
 .
@@ -56,4 +73,8 @@ is \fIxselectionrun "man -f %s | head -1"\fP, which displays a short
 description of a command or library function. Another is
 \fIxselectionrun "echo '%s' | hunspell | sed -n '2 p'"\fP,
 which runs the spell checker on the selected word.
+
+The result of the command may not be necessary. For example,
+\fIxselectionrun -q "echo '%s' >> file.txt"\fP
+appends the selection to a text file each time F1 is executed.
 
