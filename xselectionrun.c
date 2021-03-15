@@ -357,10 +357,12 @@ int main(int argc, char *argv[]) {
 	if (usage) {
 		printf("on F1, run a command on the selection and ");
 		printf("show its output\n");
-		printf("usage:\n\txselectionrun [-q] [-f] [-s] command\n");
+		printf("usage:\n\txselectionrun ");
+		printf("[-q] [-f] [-s] [-h] command\n");
 		printf("\t\t-q\texecute command but do not show its output\n");
 		printf("\t\t-f\tonly flash output for half a second\n");
 		printf("\t\t-s\tcommand output becomes the new selection\n");
+		printf("\t\t-h\tthis help\n");
 		printf("example:\n");
 		printf("\txselectionrun \"grep '%%s' data.txt\"\n");
 		printf("\tselect some text\n");
