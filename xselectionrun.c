@@ -32,6 +32,7 @@
  * font
  */
 #define FONT "-*-*-medium-r-*-*-18-*-*-*-m-*-iso10646-1"
+#define FONTFALLBACK "-*-*-*-*-*-*-*-*-*-*-*-*-*-*"
 
 /*
  * concatenate two strings
@@ -379,6 +380,7 @@ int main(int argc, char *argv[]) {
 	else
 		template = strdupcat(argv[optind], " '%s'");
 
+
 					/* open display */
 
 	dsp = XOpenDisplay(getenv("DISPLAY"));
@@ -397,6 +399,15 @@ int main(int argc, char *argv[]) {
 			CWBackPixel | CWOverrideRedirect, &swa);
 
 	fs = XLoadQueryFont(dsp, FONT);
+	if (fs == NULL) {
+		printf("WARNING: cannot find font %s\n", FONT);
+		fs = XLoadQueryFont(dsp, FONTFALLBACK);
+		if (fs == NULL) {
+			printf("ERROR: cannot find fallback font %s\n",
+				FONTFALLBACK);
+			exit(EXIT_FAILURE);
+		}
+	}
 	gc = XCreateGC(dsp, win, 0, NULL);
 	XSetFont(dsp, gc, fs->fid);
 
